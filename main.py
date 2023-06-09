@@ -3,7 +3,6 @@ import telebot
 import time
 from telebot import types
 import data
-import pytube
 import json
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -81,6 +80,7 @@ def handle_gender(message):
 
     try:
         day, month, year = map(int, birthday.split('.'))
+
 
         num = sum_digits(sum_digits(sum_digits(sum_digits(day)) + sum_digits(sum_digits(month)) + sum_digits(sum_digits(year))))
         if message.text == 'Мужской':
