@@ -83,7 +83,6 @@ def handle_gender(message):
     try:
         day, month, year = map(int, birthday.split('.'))
 
-
         num = sum_digits(sum_digits(sum_digits(sum_digits(day)) + sum_digits(sum_digits(month)) + sum_digits(sum_digits(year))))
         if message.text == 'Мужской':
             response = data.planetsM[num]
