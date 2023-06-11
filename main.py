@@ -53,17 +53,22 @@ def start(message):
     bot.send_message(chat_id, response1, parse_mode= 'MarkdownV2')
     response2 = data.intro_2
     bot.send_message(chat_id, response2, parse_mode= 'MarkdownV2')
+    user_data[str(chat_id)].update({'username': message.from_user.username})
+    user_data[str(chat_id)].update({'user.id': message.from_user.username})
+    user_data[str(chat_id)].update({'first_name': message.from_user.username})
+    user_data[str(chat_id)].update({'last_name': message.from_user.username})
+    with open('dictionary.json', 'w') as json_file:
+        json.dump(user_data, json_file)
 
 # Handle date input from users
 @bot.message_handler(regexp=r'\d{2}\.\d{2}\.\d{4}')
 def handle_date(message):
-    with open('dictionary.json') as json_file:
-        user_data = json.load(json_file)
+
     chat_id = message.chat.id
-    birthday = message.text.strip()
+    search_date = message.text.strip()
     # Perform date validation
 
-    user_data[str(chat_id)] = {'birthday': birthday}
+    user_data[str(chat_id)].update({'search_date': search_date})
     with open('dictionary.json', 'w') as json_file:
         json.dump(user_data, json_file)
     show_gender_keyboard(chat_id)
@@ -77,10 +82,10 @@ def handle_gender(message):
     chat_id = message.chat.id
     with open('dictionary.json') as json_file:
         user_data = json.load(json_file)
-    birthday = str(user_data[str(chat_id)]['birthday'])
+    search_date = str(user_data[str(chat_id)]['search_date'])
 
     try:
-        day, month, year = map(int, birthday.split('.'))
+        day, month, year = map(int, search_date.split('.'))
 
         num = sum_digits(sum_digits(sum_digits(sum_digits(day)) + sum_digits(sum_digits(month)) + sum_digits(sum_digits(year))))
         if message.text == 'Мужской':
@@ -105,9 +110,18 @@ def handle_gender(message):
         youtube_link = "https://www.youtube.com/watch?v=4tAKZb5N_CA"
         video_html = f'<a href="{youtube_link}">AstroLab</a>'
         bot.send_message(chat_id, video_html, parse_mode='HTML')
+        user_data[str(chat_id)].update({'seen_video': True})
     except ValueError:
-        response = "Введи свою дату рождения в формате ДД.ММ.ГГГГ"
+        response = "Введи свою дату рождения в формате *ДД\.ММ\.ГГГГ*"
         bot.send_message(chat_id, response, parse_mode= 'MarkdownV2')
+
+@bot.message_handler(func=lambda message: message.text not in ['Мужской', 'Женский'])
+def handle_error(message):
+    chat_id = message.chat.id
+    response = "Упс\.\.\. что\-то пошло не так\.\.\. Попробуй начать с команды ||_/start_||," \
+               " если уже ознакомился с информацией обо мне \- введи свою дату рождения в формате *ДД\.ММ\.ГГГГ*," \
+               "а затем выбери свой пол"
+    bot.send_message(chat_id, response, parse_mode='MarkdownV2')
 
 #def main():
 #    bot.polling(none_stop=True)
