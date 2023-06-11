@@ -50,9 +50,9 @@ def show_photo(chat_id,response, file):
 def start(message):
     chat_id = message.chat.id
     response1 = data.intro
-    bot.send_message(chat_id, response1)
+    bot.send_message(chat_id, response1, parse_mode= 'MarkdownV2')
     response2 = data.intro_2
-    bot.send_message(chat_id, response2)
+    bot.send_message(chat_id, response2, parse_mode= 'MarkdownV2')
 
 # Handle date input from users
 @bot.message_handler(regexp=r'\d{2}\.\d{2}\.\d{4}')
