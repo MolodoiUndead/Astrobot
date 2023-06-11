@@ -45,14 +45,13 @@ def show_photo(chat_id,response, file):
         # Send the photo file
         bot.send_photo(chat_id, photo_file, caption=response, parse_mode='MarkdownV2')
 
-
 # Handle the '/start' command
 @bot.message_handler(commands=['start'])
 def start(message):
     chat_id = message.chat.id
-    response1 = "Добро пожаловать в бота команды Astro Lab!"
+    response1 = data.intro
     bot.send_message(chat_id, response1)
-    response2 = "Введи свою дату рождения в формате ДД.ММ.ГГГГ и узнай свой базовый талант и возможности."
+    response2 = data.intro_2
     bot.send_message(chat_id, response2)
 
 # Handle date input from users
