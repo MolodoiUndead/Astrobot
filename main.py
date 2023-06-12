@@ -3,8 +3,11 @@ import telebot
 import time
 from telebot import types
 import data
-import json
-
+import psycopg2
+from psycopg2 import Error
+from psycopg2.extras import NamedTupleCursor
+import os
+import datetime
 
 # test
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -16,8 +19,11 @@ TOKEN = '6222346347:AAHyDnaolTMOdVQdj9cpQUQR4_4ucl20PWM'
 # Create an instance of the bot
 bot = telebot.TeleBot(TOKEN)
 
-with open('dictionary.json') as json_file:
-    user_data = json.load(json_file)
+os.environ['PGUSER']='postgres'
+os.environ['PGPASSWORD']='CuOuik2xVHTFF33lM4r5'
+os.environ['PGHOST']='containers-us-west-53.railway.app'
+os.environ['PGPORT']='7525'
+os.environ['PGDATABASE']='railway'
 
 def show_gender_keyboard(chat_id):
     markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True, resize_keyboard = True)
@@ -25,6 +31,7 @@ def show_gender_keyboard(chat_id):
     female_button = types.KeyboardButton('Женский')
     markup.add(male_button, female_button)
     bot.send_message(chat_id, "Выбери пол:", reply_markup=markup)
+    markup = types.ReplyKeyboardRemove()
 
 def sum_digits(n):
    r = 0
@@ -49,16 +56,32 @@ def show_photo(chat_id,response, file):
 @bot.message_handler(commands=['start'])
 def start(message):
     chat_id = message.chat.id
+    try:
+        connection1 = psycopg2.connect(user=os.getenv('PGUSER'),
+                                      password=os.getenv('PGPASSWORD'),
+                                      host=os.getenv('PGHOST'),
+                                      port=os.getenv('PGPORT'),
+                                      database=os.getenv('PGDATABASE'))
+        cursor1 = connection1.cursor(cursor_factory=NamedTupleCursor)
+        cursor1.execute("SELECT data.chat_id from data WHERE data.chat_id = {}".format(chat_id))
+        date = cursor1.fetchall()
+        if len(date) < 1:
+            cursor1.execute(
+                "INSERT INTO Public.data (first_name, last_name, user_id, username, chat_id) VALUES ('{}','{}',{},'{}',{});".format(
+                    message.from_user.first_name, message.from_user.last_name,
+                    message.from_user.id,message.from_user.username,chat_id))
+            connection1.commit()
+
+    except(Exception, Error) as error:
+        print(error)
+        print('Ошибка 1 при работе с PostgreSQL')
+    finally:
+        cursor1.close()
+        connection1.close()
     response1 = data.intro
-    bot.send_message(chat_id, response1, parse_mode= 'MarkdownV2')
+    bot.send_message(chat_id, response1, parse_mode='MarkdownV2')
     response2 = data.intro_2
-    bot.send_message(chat_id, response2, parse_mode= 'MarkdownV2')
-    user_data[str(chat_id)].update({'username': message.from_user.username})
-    user_data[str(chat_id)].update({'user.id': message.from_user.username})
-    user_data[str(chat_id)].update({'first_name': message.from_user.username})
-    user_data[str(chat_id)].update({'last_name': message.from_user.username})
-    with open('dictionary.json', 'w') as json_file:
-        json.dump(user_data, json_file)
+    bot.send_message(chat_id, response2, parse_mode='MarkdownV2')
 
 # Handle date input from users
 @bot.message_handler(regexp=r'\d{2}\.\d{2}\.\d{4}')
@@ -66,13 +89,23 @@ def handle_date(message):
 
     chat_id = message.chat.id
     search_date = message.text.strip()
-    # Perform date validation
-
-    user_data[str(chat_id)].update({'search_date': search_date})
-    with open('dictionary.json', 'w') as json_file:
-        json.dump(user_data, json_file)
-    show_gender_keyboard(chat_id)
-
+    search_date = datetime.datetime.strptime(search_date, "%d.%m.%Y").strftime("%Y-%m-%d")
+    try:
+        connection2 = psycopg2.connect(user=os.getenv('PGUSER'),
+                                      password=os.getenv('PGPASSWORD'),
+                                      host=os.getenv('PGHOST'),
+                                      port=os.getenv('PGPORT'),
+                                      database=os.getenv('PGDATABASE'))
+        cursor2 = connection2.cursor(cursor_factory=NamedTupleCursor)
+        cursor2.execute("UPDATE Public.data SET search_date = '{}' WHERE data.chat_id = {}".format(search_date,chat_id))
+        connection2.commit()
+    except(Exception, Error) as error:
+        print(error)
+        print('Ошибка 2 при работе с PostgreSQL')
+    finally:
+        cursor2.close()
+        connection2.close()
+        show_gender_keyboard(chat_id)
     #if date_valid:
     #    show_video(chat_id)
     #    logger.info('video shown')
@@ -80,12 +113,26 @@ def handle_date(message):
 @bot.message_handler(func=lambda message: message.text in ['Мужской', 'Женский'])
 def handle_gender(message):
     chat_id = message.chat.id
-    with open('dictionary.json') as json_file:
-        user_data = json.load(json_file)
-    search_date = str(user_data[str(chat_id)]['search_date'])
 
     try:
-        day, month, year = map(int, search_date.split('.'))
+        connection3 = psycopg2.connect(user=os.getenv('PGUSER'),
+                                      password=os.getenv('PGPASSWORD'),
+                                      host=os.getenv('PGHOST'),
+                                      port=os.getenv('PGPORT'),
+                                      database=os.getenv('PGDATABASE'))
+        cursor3 = connection3.cursor(cursor_factory=NamedTupleCursor)
+        cursor3.execute("SELECT data.search_date from data where chat_id = {}".format(chat_id))
+        search_date=cursor3.fetchone()
+    except(Exception, Error) as error:
+        print(error)
+        print('Ошибка 3 при работе с PostgreSQL')
+    finally:
+        cursor3.close()
+        connection3.close()
+
+
+    try:
+        day, month, year = map(int, search_date[0].strftime('%Y-%m-%d').split('-'))
 
         num = sum_digits(sum_digits(sum_digits(sum_digits(day)) + sum_digits(sum_digits(month)) + sum_digits(sum_digits(year))))
         if message.text == 'Мужской':
@@ -107,10 +154,27 @@ def handle_gender(message):
         #bot.send_video(chat_id, video_url)
 
 
-        youtube_link = "https://www.youtube.com/watch?v=4tAKZb5N_CA"
-        video_html = f'<a href="{youtube_link}">AstroLab</a>'
+        youtube_link = "https://www.youtube.com/watch?v=QFIpBjZfsG0"
+        video_html = f'<a href="{youtube_link}">Evgenia AstroLab</a>'
         bot.send_message(chat_id, video_html, parse_mode='HTML')
-        user_data[str(chat_id)].update({'seen_video': True})
+
+        try:
+            connection3 = psycopg2.connect(user=os.getenv('PGUSER'),
+                                           password=os.getenv('PGPASSWORD'),
+                                           host=os.getenv('PGHOST'),
+                                           port=os.getenv('PGPORT'),
+                                           database=os.getenv('PGDATABASE'))
+            cursor3 = connection3.cursor(cursor_factory=NamedTupleCursor)
+            cursor3.execute("UPDATE Public.data SET seen = {} WHERE data.chat_id = {}".format(True,chat_id))
+            connection3.commit()
+
+        except(Exception, Error) as error:
+            print(error)
+            print('Ошибка 3.1 при работе с PostgreSQL')
+        finally:
+            cursor3.close()
+            connection3.close()
+
     except ValueError:
         response = "Введи свою дату рождения в формате *ДД\.ММ\.ГГГГ*"
         bot.send_message(chat_id, response, parse_mode= 'MarkdownV2')
@@ -131,7 +195,5 @@ if __name__ == '__main__':
         try:
             bot.polling(none_stop=True)
         except Exception as e:
-            with open('dictionary.json', 'w') as json_file:
-                json.dump(user_data, json_file)
             time.sleep(1)
             logger.info(e)
