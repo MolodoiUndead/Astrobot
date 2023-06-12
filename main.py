@@ -35,13 +35,13 @@ def sum_digits(n):
 def show_video(chat_id):
     # Load the video file from the local disk
     caption = "Тут могла быть Ваша реклама!"
-    with open('C:/Users/ромазавр/astrobot/IMG_0751.MOV', 'rb') as video_file:
+    with open('IMG_0751.MOV', 'rb') as video_file:
         # Send the video file
         bot.send_video(chat_id, video_file, caption=caption)
 
 def show_photo(chat_id,response, file):
     # Load the photo file from the local disk
-    with open('C:/Users/ромазавр/astrobot/'+file, 'rb') as photo_file:
+    with open(file, 'rb') as photo_file:
         # Send the photo file
         bot.send_photo(chat_id, photo_file, caption=response, parse_mode='MarkdownV2')
 
