@@ -19,11 +19,11 @@ TOKEN = '6222346347:AAHyDnaolTMOdVQdj9cpQUQR4_4ucl20PWM'
 # Create an instance of the bot
 bot = telebot.TeleBot(TOKEN)
 
-os.environ['PGUSER']='postgres'
-os.environ['PGPASSWORD']='CuOuik2xVHTFF33lM4r5'
-os.environ['PGHOST']='containers-us-west-53.railway.app'
-os.environ['PGPORT']='7525'
-os.environ['PGDATABASE']='railway'
+#os.environ['PGUSER']='postgres'
+#os.environ['PGPASSWORD']='CuOuik2xVHTFF33lM4r5'
+#os.environ['PGHOST']='containers-us-west-53.railway.app'
+#os.environ['PGPORT']='7525'
+#os.environ['PGDATABASE']='railway'
 
 def show_gender_keyboard(chat_id):
     markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True, resize_keyboard = True)
@@ -31,7 +31,8 @@ def show_gender_keyboard(chat_id):
     female_button = types.KeyboardButton('Женский')
     markup.add(male_button, female_button)
     bot.send_message(chat_id, "Выбери пол:", reply_markup=markup)
-    markup = types.ReplyKeyboardRemove()
+    markup_new = types.ReplyKeyboardRemove()
+    bot.send_message(chat_id, "", reply_markup=markup_new)
 
 def sum_digits(n):
    r = 0
