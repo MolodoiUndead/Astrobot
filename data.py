@@ -1,6 +1,8 @@
 picturesM = {1:'1m.jpg',2:'2m.jpg',3:'3m.jpg',4:'4m.jpg',5:'5m.jpg',6:'6m.jpg',7:'7m.jpg',8:'8m.jpg',9:'9m.jpg'}
 picturesF = {1:'1f.jpg',2:'2f.jpg',3:'3f.jpg',4:'4f.jpg',5:'5f.jpg',6:'6f.jpg',7:'7f.jpg',8:'8f.jpg',9:'9f.jpg'}
 
+picture_paths = ['comment_1.jpg','comment_2.jpg','comment_3.jpg']
+
 astro_video = {'Start':'https://youtu.be/Up1U-4pibKU','Monday':'https://youtu.be/JBBXJ6OCSb8', 'Tuesday':'https://youtu.be/oIrzaCc5gt4', 'Wednesday':'https://youtu.be/XsvG1RXGeIk','Thursday':'https://youtu.be/xrdsoZrfplU','Friday':'https://youtu.be/i27FK0RJ9H0','Saturday':'https://youtu.be/l62QrdTAHk8','Sunday':'https://www.youtube.com/watch?v=7QZ8UnRL-xc'}
 
 astroweek ='''Если тебе понравилось узнавать о себе новое, то приглашаю тебя *в следующий этап\.* 

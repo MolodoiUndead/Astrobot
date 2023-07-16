@@ -8,29 +8,71 @@ from psycopg2 import Error
 from psycopg2.extras import NamedTupleCursor
 import os
 import datetime
-from yookassa import Configuration
+from yookassa import Configuration,Payment
 import schedule
 from threading import Thread
+import uuid
+import json
+import asyncio
+from telebot import apihelper
 
-#Configuration.account_id = ''
-#Configuration.secret_key = '381764678:TEST:60173'
+Configuration.account_id = os.getenv('ACC_ID')
+#'219009'
+Configuration.secret_key = os.getenv('KEY')
+#'live_DNLV_Mwuqga6CeMLSQwekNG_K-aWAKYHap_UTBFof8g'
 
 # test
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set up the Telegram Bot token
-#os.environ['TELEGRAM_TOKEN']='6030183564:AAH1-VdUq3Gu6KvI6SHQa9klkBrGX7Pa9oM'
-#os.environ['YOO_TOKEN']='381764678:TEST:60173'
-#os.environ['YOO_TOKEN']='381764678:TEST:59224'
+#os.environ['TELEGRAM_TOKEN']='6222346347:AAHyDnaolTMOdVQdj9cpQUQR4_4ucl20PWM'
+#os.environ['YOO_TOKEN']='390540012:LIVE:35652'
+
+##os.environ['TELEGRAM_TOKEN']='6030183564:AAH1-VdUq3Gu6KvI6SHQa9klkBrGX7Pa9oM'
+##os.environ['YOO_TOKEN']='381764678:TEST:60173'
+##os.environ['YOO_TOKEN']='381764678:TEST:59224'
 #os.environ['PGUSER']='postgres'
 #os.environ['PGPASSWORD']='CuOuik2xVHTFF33lM4r5'
 #os.environ['PGHOST']='containers-us-west-53.railway.app'
 #os.environ['PGPORT']='7525'
 #os.environ['PGDATABASE']='railway'
+#os.environ['ASTROLAB_PRICE'] = 100
 
 # Create an instance of the bot
 bot = telebot.TeleBot(os.getenv('TELEGRAM_TOKEN'))
+
+def payment(value,description):
+	payment = Payment.create({
+    "amount": {
+        "value": value,
+        "currency": "RUB"
+    },
+    "payment_method_data": {
+        "type": "sberbank"
+    },
+    "confirmation": {
+        "type": "redirect",
+        "return_url": "https://t.me/AstroLab_bot"
+    },
+    "capture": True,
+    "description": description
+	})
+	return json.loads(payment.json())
+
+def check_payment(payment_id):
+	payment = json.loads((Payment.find_one(payment_id)).json())
+	while payment['status'] == 'pending':
+		payment = json.loads((Payment.find_one(payment_id)).json())
+		time.sleep(5)
+	if payment['status']=='succeeded':
+		logger.info("SUCCSESS RETURN")
+		logger.info(payment)
+		return True
+	else:
+		logger.info("BAD RETURN")
+		logger.info(payment)
+		return False
 
 def send_day():
     day_name = datetime.date.today()
@@ -61,6 +103,14 @@ def send_day():
     finally:
         cursor_day.close()
         connection_day.close()
+
+# Function to send multiple images in a single message
+def send_multiple_images(chat_id, image_paths):
+    media = []
+    for path in image_paths:
+        with open(path, 'rb') as file:
+            media.append(types.InputMediaPhoto(media=file.read()))
+    bot.send_media_group(chat_id, media)
 
 def show_gender_keyboard(chat_id):
     keyboard = types.InlineKeyboardMarkup()
@@ -135,14 +185,10 @@ def handle_date(message):
                                       port=os.getenv('PGPORT'),
                                       database=os.getenv('PGDATABASE'))
         cursor2 = connection2.cursor(cursor_factory=NamedTupleCursor)
-        cursor2.execute("SELECT data.seen from data where chat_id = {}".format(chat_id))
-        seen = cursor2.fetchone()[0]
-        if seen < 5:
-            cursor2.execute("UPDATE Public.data SET search_date = '{}' WHERE data.chat_id = {}".format(search_date,chat_id))
-            connection2.commit()
-            show_gender_keyboard(chat_id)
-        else:
-            bot.send_message(chat_id, "XXX", parse_mode='MarkdownV2')
+
+        cursor2.execute("UPDATE Public.data SET search_date = '{}' WHERE data.chat_id = {}".format(search_date,chat_id))
+        connection2.commit()
+        show_gender_keyboard(chat_id)
     except(Exception, Error) as error:
         logger.info(error)
         print(error)
@@ -177,57 +223,62 @@ def handle_gender(call: types.CallbackQuery):
         cursor3.close()
         connection3.close()
 
-    if seen < 6:
+    if seen > 4:
+        bot.send_message(chat_id, "А еще больше в аккууте инстагарам\! \n https://instagram\.com/evgenia\.astrolab", parse_mode='MarkdownV2')
+    try:
+        day, month, year = map(int, search_date[0].strftime('%Y-%m-%d').split('-'))
+
+        num = sum_digits(sum_digits(sum_digits(sum_digits(day)) + sum_digits(sum_digits(month)) + sum_digits(sum_digits(year))))
+        if call.data == 'man':
+            response = data.planetsM[num]
+            file = data.picturesM[num]
+        else:
+            response = data.planetsF[num]
+            file = data.picturesF[num]
+        show_photo(chat_id, response, file)
+
+        # Get the highest quality video stream using pytube
+        #video = pytube.YouTube('https://youtu.be/Up1U-4pibKU')
+        #video_stream = video.streams.get_highest_resolution()
+        #video_stream = video.streams.filter(file_extension='mp4',res='360p').first()
+        #print(video.streams)
+        #video_url = video_stream.url
+
+        # Send the video by URL
+        #bot.send_video(chat_id, video_url)
+
+        if seen < 1:
+            youtube_link = "https://www.youtube.com/watch?v=QFIpBjZfsG0"
+            video_html = f'<a href="{youtube_link}">Evgenia AstroLab</a>'
+            bot.send_message(chat_id, video_html, parse_mode='HTML')
+
         try:
-            day, month, year = map(int, search_date[0].strftime('%Y-%m-%d').split('-'))
-
-            num = sum_digits(sum_digits(sum_digits(sum_digits(day)) + sum_digits(sum_digits(month)) + sum_digits(sum_digits(year))))
-            if call.data == 'man':
-                response = data.planetsM[num]
-                file = data.picturesM[num]
-            else:
-                response = data.planetsF[num]
-                file = data.picturesF[num]
-            show_photo(chat_id, response, file)
-
-            # Get the highest quality video stream using pytube
-            #video = pytube.YouTube('https://youtu.be/Up1U-4pibKU')
-            #video_stream = video.streams.get_highest_resolution()
-            #video_stream = video.streams.filter(file_extension='mp4',res='360p').first()
-            #print(video.streams)
-            #video_url = video_stream.url
-
-            # Send the video by URL
-            #bot.send_video(chat_id, video_url)
-
-            if seen < 1:
-                youtube_link = "https://www.youtube.com/watch?v=QFIpBjZfsG0"
-                video_html = f'<a href="{youtube_link}">Evgenia AstroLab</a>'
-                bot.send_message(chat_id, video_html, parse_mode='HTML')
-
-            try:
-                connection3 = psycopg2.connect(user=os.getenv('PGUSER'),
-                                               password=os.getenv('PGPASSWORD'),
-                                               host=os.getenv('PGHOST'),
-                                               port=os.getenv('PGPORT'),
-                                               database=os.getenv('PGDATABASE'))
-                cursor3 = connection3.cursor(cursor_factory=NamedTupleCursor)
-                cursor3.execute("UPDATE Public.data SET seen = {} WHERE data.chat_id = {}".format(seen + 1,chat_id))
-                connection3.commit()
-
-            except(Exception, Error) as error:
-                logger.info(error)
-                print(error)
-                print('Ошибка 3.1 при работе с PostgreSQL')
-            finally:
-                cursor3.close()
-                connection3.close()
-
-        except ValueError:
-            response = "Введи свою дату рождения в формате *ДД\.ММ\.ГГГГ*"
-            bot.send_message(chat_id, response, parse_mode= 'MarkdownV2')
+            connection3 = psycopg2.connect(user=os.getenv('PGUSER'),
+                                           password=os.getenv('PGPASSWORD'),
+                                           host=os.getenv('PGHOST'),
+                                           port=os.getenv('PGPORT'),
+                                           database=os.getenv('PGDATABASE'))
+            cursor3 = connection3.cursor(cursor_factory=NamedTupleCursor)
+            cursor3.execute("UPDATE Public.data SET seen = {} WHERE data.chat_id = {}".format(seen + 1,chat_id))
+            connection3.commit()
+            cursor3.execute(
+                "SELECT chat_id from astroweek where astroweek.chat_id = (select id from public.data where data.chat_id = {})".format(
+                    chat_id))
+            id = cursor3.fetchone()
+        except(Exception, Error) as error:
+            logger.info(error)
+            print(error)
+            print('Ошибка 3.1 при работе с PostgreSQL')
         finally:
-            time.sleep(1)
+            cursor3.close()
+            connection3.close()
+
+    except ValueError:
+        response = "Введи свою дату рождения в формате *ДД\.ММ\.ГГГГ*"
+        bot.send_message(chat_id, response, parse_mode= 'MarkdownV2')
+    finally:
+        time.sleep(1)
+        if id == None:
             keyboard = types.InlineKeyboardMarkup()
             row1 = [types.InlineKeyboardButton('Получить доступ к ASTROWEEK!', callback_data='astroweek')]
             row2 = [types.InlineKeyboardButton('Посмотрет отзывы', callback_data='comments')]
@@ -236,10 +287,12 @@ def handle_gender(call: types.CallbackQuery):
             keyboard.add(*row2)
             keyboard.add(*row3)
             bot.send_message(chat_id, data.astroweek,reply_markup=keyboard, parse_mode= 'MarkdownV2')
-            bot.delete_message(chat_id, call.message.message_id)
+        else:
+            bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
+        bot.delete_message(chat_id, call.message.message_id)
 
-    else:
-        bot.send_message(chat_id, "XXX", parse_mode='MarkdownV2')
+    #else:
+    #    bot.send_message(chat_id, "XXX", parse_mode='MarkdownV2')
 
 @bot.message_handler(func=lambda message: True)
 def handle_error(message):
@@ -265,13 +318,44 @@ def astroweek(call: types.CallbackQuery):
     except(Exception, Error) as error:
         logger.info(error)
         print(error)
-        print('Ошибка 3 при работе с PostgreSQL')
+        print('Ошибка 4 при работе с PostgreSQL')
     finally:
         cursor4.close()
         connection4.close()
     #bot.delete_message(chat_id, call.message.message_id)
     if id == None:
-        logger.info(os.getenv('YOO_TOKEN'))
+        #call.message.answer('Оплата марафона')
+        payment_deatils = payment(os.getenv('ASTROLAB_PRICE'), 'Доступ к ASTROWEEK')
+        #call.message.answer((payment_deatils['confirmation'])['confirmation_url'])
+        bot.send_message(chat_id,'Ссылка на оплату: \n'+(payment_deatils['confirmation'])['confirmation_url'])
+        if check_payment(payment_deatils['id']):
+            #call.message.answer("платеж")
+            bot.send_message(chat_id,"Оплата прошла успешно!")
+            try:
+                connection4 = psycopg2.connect(user=os.getenv('PGUSER'),
+                                               password=os.getenv('PGPASSWORD'),
+                                               host=os.getenv('PGHOST'),
+                                               port=os.getenv('PGPORT'),
+                                               database=os.getenv('PGDATABASE'))
+                cursor4 = connection4.cursor(cursor_factory=NamedTupleCursor)
+                cursor4.execute(
+                    "INSERT INTO Public.astroweek (chat_id) VALUES ((select id from public.data where data.chat_id = {}));".format(
+                        chat_id))
+                connection4.commit()
+                youtube_link = data.astro_video['Start']
+                video_html = f'<a href="{youtube_link}">' + 'Введение' + '</a>'
+                bot.send_message(chat_id, video_html, parse_mode='HTML')
+            except(Exception, Error) as error:
+                logger.info(error)
+                print(error)
+                print('Ошибка 4 при работе с PostgreSQL')
+            finally:
+                cursor4.close()
+                connection4.close()
+        else:
+            #call.message.answer("платеж не прошел")
+            bot.send_message(chat_id,'Оплата не удалась, попробуй еще раз или обратись в поддержку!')
+        '''bot.send_message(chat_id,'https://yookassa.ru/my/i/ZLQIyDX6rGTs/l')
         bot.send_invoice(chat_id=chat_id,
                          title='ASTROWEEK',
                          description='Полный доступ к недельному марафону',
@@ -279,17 +363,18 @@ def astroweek(call: types.CallbackQuery):
                          provider_token=os.getenv('YOO_TOKEN'),
                          currency='RUB',
                          start_parameter='astroweek',
-                         prices=[types.LabeledPrice(label='astroweek', amount=10000)])
+                         prices=[types.LabeledPrice(label='astroweek', amount=10000)])'''
     else:
         bot.send_message(chat_id,'Похоже, ты уже приобрел доступ к Astroweek. Если первое видео еще не пришло, жди его в ближайший понедельник!')
 
-@bot.pre_checkout_query_handler(func=lambda query: True)
+'''@bot.pre_checkout_query_handler(func=lambda query: True)
 def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery):
     bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
 @bot.message_handler(content_types=['successful_payment'])
 def process_pay(message: types.Message):
     chat_id = message.chat.id
+    logger.info(message.successful_payment.order_info)
     if message.successful_payment.invoice_payload == 'astroweek':
         try:
             connection4 = psycopg2.connect(user=os.getenv('PGUSER'),
@@ -309,13 +394,21 @@ def process_pay(message: types.Message):
             print('Ошибка 4 при работе с PostgreSQL')
         finally:
             cursor4.close()
-            connection4.close()
+            connection4.close()'''
 
 @bot.callback_query_handler(func= lambda call: call.data == 'later')
-def astroweek(call: types.CallbackQuery):
+def later_func(call: types.CallbackQuery):
     chat_id = call.message.chat.id
     #bot.delete_message(chat_id, call.message.message_id)
     bot.send_message(chat_id, data.later, parse_mode= 'MarkdownV2')
+
+@bot.callback_query_handler(func= lambda call: call.data == 'comments')
+def comments_func(call: types.CallbackQuery):
+    chat_id = call.message.chat.id
+    #bot.delete_message(chat_id, call.message.message_id)
+    send_multiple_images(chat_id,data.picture_paths)
+    time.sleep(3)
+    bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
 
 def schedule_checker():
     while True:
@@ -328,7 +421,7 @@ def run_bot():
     bot.polling(none_stop=True)
 
 if __name__ == '__main__':
-    schedule.every().day.at('13:05').do(send_day)
+    schedule.every().day.at('09:00').do(send_day)
     while True:
         try:
             run_bot()
