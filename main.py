@@ -278,7 +278,7 @@ def astroweek(call: types.CallbackQuery):
                          provider_token=os.getenv('YOO_TOKEN'),
                          currency='RUB',
                          start_parameter='astroweek',
-                         prices=[types.LabeledPrice(label='astroweek', amount=1000)])
+                         prices=[types.LabeledPrice(label='astroweek', amount=10000)])
     else:
         bot.send_message(chat_id,'Похоже, ты уже приобрел доступ к Astroweek. Если первое видео еще не пришло, жди его в ближайший понедельник!')
 
