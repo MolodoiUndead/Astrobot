@@ -271,6 +271,7 @@ def astroweek(call: types.CallbackQuery):
         connection4.close()
     #bot.delete_message(chat_id, call.message.message_id)
     if id == None:
+        logger.info(os.getenv('YOO_TOKEN'))
         bot.send_invoice(chat_id=chat_id,
                          title='ASTROWEEK',
                          description='Полный доступ к недельному марафону',
