@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Set up the Telegram Bot token
 #os.environ['TELEGRAM_TOKEN']='6030183564:AAH1-VdUq3Gu6KvI6SHQa9klkBrGX7Pa9oM'
 #os.environ['YOO_TOKEN']='381764678:TEST:60173'
-os.environ['YOO_TOKEN']='381764678:TEST:59224'
+#os.environ['YOO_TOKEN']='381764678:TEST:59224'
 #os.environ['PGUSER']='postgres'
 #os.environ['PGPASSWORD']='CuOuik2xVHTFF33lM4r5'
 #os.environ['PGHOST']='containers-us-west-53.railway.app'
@@ -278,7 +278,7 @@ def astroweek(call: types.CallbackQuery):
                          provider_token=os.getenv('YOO_TOKEN'),
                          currency='RUB',
                          start_parameter='astroweek',
-                         prices=[types.LabeledPrice(label='astroweek', amount=15000)])
+                         prices=[types.LabeledPrice(label='astroweek', amount=1000)])
     else:
         bot.send_message(chat_id,'Похоже, ты уже приобрел доступ к Astroweek. Если первое видео еще не пришло, жди его в ближайший понедельник!')
 
