@@ -286,6 +286,7 @@ def handle_gender(call: types.CallbackQuery):
             keyboard.add(*row1)
             keyboard.add(*row2)
             keyboard.add(*row3)
+            time.sleep(10)
             bot.send_message(chat_id, data.astroweek,reply_markup=keyboard, parse_mode= 'MarkdownV2')
         else:
             bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
