@@ -419,7 +419,7 @@ def run_bot():
     bot.polling(none_stop=True)
 
 if __name__ == '__main__':
-    schedule.every().day.at('09:00').do(send_day)
+    schedule.every().day.at('16:00').do(send_day)
     while True:
         try:
             run_bot()
