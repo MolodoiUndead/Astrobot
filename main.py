@@ -48,9 +48,6 @@ def payment(value,description):
         "value": value,
         "currency": "RUB"
     },
-    "payment_method_data": {
-        "type": "sberbank"
-    },
     "confirmation": {
         "type": "redirect",
         "return_url": "https://t.me/AstroLab_bot"
