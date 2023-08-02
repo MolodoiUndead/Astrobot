@@ -479,7 +479,7 @@ async def comments_func(call: types.CallbackQuery):
 
 async def run_bot():
     # Start the bot polling
-    scheduler.add_job(send_day,'cron', day_of_week='mon-sun', hour=18, minute=6, args=(bot,))
+    scheduler.add_job(send_day,'cron', day_of_week='mon-sun', hour=9, minute=0, args=(bot,))
     scheduler.start()
     await bot.polling(none_stop=True)
 
