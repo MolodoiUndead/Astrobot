@@ -445,7 +445,7 @@ async def astroweek_now(call: types.CallbackQuery):
             await asyncio.sleep(3)
             if i.lower() == 'sunday':
                 await asyncio.sleep(2)
-                await send_pptx(i,'Курс подошел к концу. Эта шпаргалка поможет в будущем)')
+                await send_pptx(chat_id,'Курс подошел к концу. Эта шпаргалка поможет в будущем)')
         connection7.commit()
     except(Exception, Error) as error:
         logger.info(error)
