@@ -1,6 +1,5 @@
 import logging
-import telebot
-import time
+from telebot.async_telebot import AsyncTeleBot
 from telebot import types
 import data
 import psycopg2
@@ -9,27 +8,29 @@ from psycopg2.extras import NamedTupleCursor
 import os
 import datetime
 from yookassa import Configuration,Payment
-import schedule
-from threading import Thread
-import uuid
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import json
 import asyncio
-from telebot import apihelper
+from tzlocal import get_localzone
+
+
+scheduler = AsyncIOScheduler(timezone=str(get_localzone()))
+
+#os.environ['ACC_ID']='219009'
+#os.environ['KEY']='live_DNLV_Mwuqga6CeMLSQwekNG_K-aWAKYHap_UTBFof8g'
 
 Configuration.account_id = os.getenv('ACC_ID')
-#'219009'
 Configuration.secret_key = os.getenv('KEY')
-#'live_DNLV_Mwuqga6CeMLSQwekNG_K-aWAKYHap_UTBFof8g'
 
 # test
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set up the Telegram Bot token
-#os.environ['TELEGRAM_TOKEN']='6222346347:AAHyDnaolTMOdVQdj9cpQUQR4_4ucl20PWM'
-#os.environ['YOO_TOKEN']='390540012:LIVE:35652'
+##os.environ['TELEGRAM_TOKEN']='6222346347:AAHyDnaolTMOdVQdj9cpQUQR4_4ucl20PWM'
+##os.environ['YOO_TOKEN']='390540012:LIVE:35652'
 
-##os.environ['TELEGRAM_TOKEN']='6030183564:AAH1-VdUq3Gu6KvI6SHQa9klkBrGX7Pa9oM'
+#os.environ['TELEGRAM_TOKEN']='6030183564:AAH1-VdUq3Gu6KvI6SHQa9klkBrGX7Pa9oM'
 ##os.environ['YOO_TOKEN']='381764678:TEST:60173'
 ##os.environ['YOO_TOKEN']='381764678:TEST:59224'
 #os.environ['PGUSER']='postgres'
@@ -37,19 +38,16 @@ logger = logging.getLogger(__name__)
 #os.environ['PGHOST']='containers-us-west-53.railway.app'
 #os.environ['PGPORT']='7525'
 #os.environ['PGDATABASE']='railway'
-#os.environ['ASTROLAB_PRICE'] = 100
+#os.environ['ASTROLAB_PRICE'] = '10.00'
 
 # Create an instance of the bot
-bot = telebot.TeleBot(os.getenv('TELEGRAM_TOKEN'))
+bot = AsyncTeleBot(os.getenv('TELEGRAM_TOKEN'))
 
 def payment(value,description):
 	payment = Payment.create({
     "amount": {
         "value": value,
         "currency": "RUB"
-    },
-    "payment_method_data": {
-        "type": "sberbank"
     },
     "confirmation": {
         "type": "redirect",
@@ -60,11 +58,11 @@ def payment(value,description):
 	})
 	return json.loads(payment.json())
 
-def check_payment(payment_id):
+async def check_payment(payment_id):
 	payment = json.loads((Payment.find_one(payment_id)).json())
 	while payment['status'] == 'pending':
 		payment = json.loads((Payment.find_one(payment_id)).json())
-		time.sleep(5)
+		await asyncio.sleep(5)
 	if payment['status']=='succeeded':
 		logger.info("SUCCSESS RETURN")
 		logger.info(payment)
@@ -74,7 +72,10 @@ def check_payment(payment_id):
 		logger.info(payment)
 		return False
 
-def send_day():
+#async def send_astrovideo(i,video_html):
+#    await bot.send_message(i, video_html, parse_mode='HTML')
+
+async def send_day(bot: bot):
     day_name = datetime.date.today()
     day_name = day_name.strftime("%A")
     try:
@@ -91,33 +92,43 @@ def send_day():
         list = [r[0] for r in cursor_day.fetchall()]
 
         youtube_link = data.astro_video[day_name]
+
         video_html = f'<a href="{youtube_link}">'+day_name+'</a>'
         for i in list:
-            bot.send_message(i, video_html, parse_mode='HTML')
+            await bot.send_message(i,video_html, parse_mode='HTML')
+            #for j in ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']:
+            #await asyncio.sleep(1)
+            #await bot.send_message(i, data.description[day_name], parse_mode='MarkdownV2')
+            await asyncio.sleep(3)
+            await bot.send_message(i,data.tasks[day_name] , parse_mode='MarkdownV2')
             cursor_day.execute("UPDATE Public.astroweek SET \"{}\" = True WHERE astroweek.chat_id = (select data.id from data where chat_id = {})".format(day_name.lower(),i))
             connection_day.commit()
+            if day_name.lower() == 'sunday':
+                await asyncio.sleep(2)
+                await send_pptx(i,'Курс подошел к концу. Эта шпаргалка поможет в будущем)')
     except(Exception, Error) as error:
         logger.info(error)
         print(error)
-        print('Ошибка day при работе с PostgreSQL')
+        print('Ошибка при работе с PostgreSQL')
     finally:
         cursor_day.close()
         connection_day.close()
+        await asyncio.sleep(3)
 
 # Function to send multiple images in a single message
-def send_multiple_images(chat_id, image_paths):
+async def send_multiple_images(chat_id, image_paths):
     media = []
     for path in image_paths:
         with open(path, 'rb') as file:
             media.append(types.InputMediaPhoto(media=file.read()))
-    bot.send_media_group(chat_id, media)
+    await bot.send_media_group(chat_id, media)
 
-def show_gender_keyboard(chat_id):
+async def show_gender_keyboard(chat_id):
     keyboard = types.InlineKeyboardMarkup()
     row1 = [types.InlineKeyboardButton('Мужской', callback_data='man'),
             types.InlineKeyboardButton('Женский', callback_data='woman')]
     keyboard.add(*row1)
-    bot.send_message(chat_id, "Выбери пол:", reply_markup=keyboard)
+    await bot.send_message(chat_id, "Выбери пол:", reply_markup=keyboard)
     markup_new = types.ReplyKeyboardRemove()
 
 def sum_digits(n):
@@ -126,22 +137,27 @@ def sum_digits(n):
        r, n = r + n % 10, n // 10
    return r
 
-def show_video(chat_id):
+async def send_pptx(chat_id, caption):
+    # Load the video file from the local disk
+    with open('Astrolab_Astroweek.pptx', 'rb') as file:
+        await bot.send_document(chat_id, file, caption=caption)
+
+async def show_video(chat_id):
     # Load the video file from the local disk
     caption = "Тут могла быть Ваша реклама!"
     with open('IMG_0751.MOV', 'rb') as video_file:
         # Send the video file
-        bot.send_video(chat_id, video_file, caption=caption)
+        await bot.send_video(chat_id, video_file, caption=caption)
 
-def show_photo(chat_id,response, file):
+async def show_photo(chat_id,response, file):
     # Load the photo file from the local disk
     with open(file, 'rb') as photo_file:
         # Send the photo file
-        bot.send_photo(chat_id, photo_file, caption=response, parse_mode='MarkdownV2')
+        await bot.send_photo(chat_id, photo_file, caption=response, parse_mode='MarkdownV2')
 
 # Handle the '/start' command
 @bot.message_handler(commands=['start'])
-def start(message):
+async def start(message):
     chat_id = message.chat.id
     try:
         connection1 = psycopg2.connect(user=os.getenv('PGUSER'),
@@ -167,13 +183,13 @@ def start(message):
         cursor1.close()
         connection1.close()
     response1 = data.intro
-    bot.send_message(chat_id, response1, parse_mode='MarkdownV2')
+    await bot.send_message(chat_id, response1, parse_mode='MarkdownV2')
     response2 = data.intro_2
-    bot.send_message(chat_id, response2, parse_mode='MarkdownV2')
+    await bot.send_message(chat_id, response2, parse_mode='MarkdownV2')
 
 # Handle date input from users
 @bot.message_handler(regexp=r'\d{2}\.\d{2}\.\d{4}')
-def handle_date(message):
+async def handle_date(message):
 
     chat_id = message.chat.id
     search_date = message.text.strip()
@@ -188,7 +204,7 @@ def handle_date(message):
 
         cursor2.execute("UPDATE Public.data SET search_date = '{}' WHERE data.chat_id = {}".format(search_date,chat_id))
         connection2.commit()
-        show_gender_keyboard(chat_id)
+        await show_gender_keyboard(chat_id)
     except(Exception, Error) as error:
         logger.info(error)
         print(error)
@@ -197,11 +213,11 @@ def handle_date(message):
         cursor2.close()
         connection2.close()
     #if date_valid:
-    #    show_video(chat_id)
+    #    await show_video(chat_id)
     #    logger.info('video shown')
 
 @bot.callback_query_handler(func=lambda call: call.data in ['man','woman'])
-def handle_gender(call: types.CallbackQuery):
+async def handle_gender(call: types.CallbackQuery):
     chat_id = call.message.chat.id
 
     try:
@@ -224,7 +240,7 @@ def handle_gender(call: types.CallbackQuery):
         connection3.close()
 
     if seen > 4:
-        bot.send_message(chat_id, "А еще больше в аккууте инстагарам\! \n https://instagram\.com/evgenia\.astrolab", parse_mode='MarkdownV2')
+        await bot.send_message(chat_id, "А еще больше в аккууте инстагарам\! \n https://instagram\.com/evgenia\.astrolab", parse_mode='MarkdownV2')
     try:
         day, month, year = map(int, search_date[0].strftime('%Y-%m-%d').split('-'))
 
@@ -235,7 +251,7 @@ def handle_gender(call: types.CallbackQuery):
         else:
             response = data.planetsF[num]
             file = data.picturesF[num]
-        show_photo(chat_id, response, file)
+        await show_photo(chat_id, response, file)
 
         # Get the highest quality video stream using pytube
         #video = pytube.YouTube('https://youtu.be/Up1U-4pibKU')
@@ -250,7 +266,7 @@ def handle_gender(call: types.CallbackQuery):
         if seen < 1:
             youtube_link = "https://www.youtube.com/watch?v=QFIpBjZfsG0"
             video_html = f'<a href="{youtube_link}">Evgenia AstroLab</a>'
-            bot.send_message(chat_id, video_html, parse_mode='HTML')
+            await bot.send_message(chat_id, video_html, parse_mode='HTML')
 
         try:
             connection3 = psycopg2.connect(user=os.getenv('PGUSER'),
@@ -275,9 +291,9 @@ def handle_gender(call: types.CallbackQuery):
 
     except ValueError:
         response = "Введи свою дату рождения в формате *ДД\.ММ\.ГГГГ*"
-        bot.send_message(chat_id, response, parse_mode= 'MarkdownV2')
+        await bot.send_message(chat_id, response, parse_mode= 'MarkdownV2')
     finally:
-        time.sleep(1)
+        await asyncio.sleep(3)
         if id == None:
             keyboard = types.InlineKeyboardMarkup()
             row1 = [types.InlineKeyboardButton('Получить доступ к ASTROWEEK!', callback_data='astroweek')]
@@ -286,25 +302,25 @@ def handle_gender(call: types.CallbackQuery):
             keyboard.add(*row1)
             keyboard.add(*row2)
             keyboard.add(*row3)
-            time.sleep(10)
-            bot.send_message(chat_id, data.astroweek,reply_markup=keyboard, parse_mode= 'MarkdownV2')
+            await asyncio.sleep(10)
+            await bot.send_message(chat_id, data.astroweek,reply_markup=keyboard, parse_mode= 'MarkdownV2')
         else:
-            bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
-        bot.delete_message(chat_id, call.message.message_id)
+            await bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
+        await bot.delete_message(chat_id, call.message.message_id)
 
     #else:
     #    bot.send_message(chat_id, "XXX", parse_mode='MarkdownV2')
 
 @bot.message_handler(func=lambda message: True)
-def handle_error(message):
+async def handle_error(message):
     chat_id = message.chat.id
     response = "Упс\.\.\. что\-то пошло не так\.\.\. Попробуй начать с команды ||_/start_||," \
                " если уже ознакомился с информацией обо мне \- введи свою дату рождения в формате *ДД\.ММ\.ГГГГ*," \
                "а затем выбери свой пол"
-    bot.send_message(chat_id, response, parse_mode='MarkdownV2')
+    await bot.send_message(chat_id, response, parse_mode='MarkdownV2')
 
 @bot.callback_query_handler(func= lambda call: call.data == 'astroweek')
-def astroweek(call: types.CallbackQuery):
+async def astroweek(call: types.CallbackQuery):
     chat_id = call.message.chat.id
     id = []
     try:
@@ -328,10 +344,10 @@ def astroweek(call: types.CallbackQuery):
         #call.message.answer('Оплата марафона')
         payment_deatils = payment(os.getenv('ASTROLAB_PRICE'), 'Доступ к ASTROWEEK')
         #call.message.answer((payment_deatils['confirmation'])['confirmation_url'])
-        bot.send_message(chat_id,'Ссылка на оплату: \n'+(payment_deatils['confirmation'])['confirmation_url'])
-        if check_payment(payment_deatils['id']):
+        await bot.send_message(chat_id,'Ссылка на оплату: \n'+(payment_deatils['confirmation'])['confirmation_url'])
+        if await check_payment(payment_deatils['id']):
             #call.message.answer("платеж")
-            bot.send_message(chat_id,"Оплата прошла успешно!")
+            await bot.send_message(chat_id,"Оплата прошла успешно!")
             try:
                 connection4 = psycopg2.connect(user=os.getenv('PGUSER'),
                                                password=os.getenv('PGPASSWORD'),
@@ -345,7 +361,15 @@ def astroweek(call: types.CallbackQuery):
                 connection4.commit()
                 youtube_link = data.astro_video['Start']
                 video_html = f'<a href="{youtube_link}">' + 'Введение' + '</a>'
-                bot.send_message(chat_id, video_html, parse_mode='HTML')
+                await bot.send_message(chat_id, video_html, parse_mode='HTML')
+                await bot.send_message(chat_id, data.description['Start'], parse_mode='MarkdownV2')
+                keyboard = types.InlineKeyboardMarkup()
+                row1 = [types.InlineKeyboardButton('Открыть полный доступ к курсу сейчас', callback_data='now')]
+                row2 = [types.InlineKeyboardButton('Начать с ближайшего понедельника (рекомендуется)', callback_data='days')]
+                keyboard.add(*row1)
+                keyboard.add(*row2)
+                await asyncio.sleep(5)
+                await bot.send_message(chat_id, data.selection, reply_markup=keyboard, parse_mode='MarkdownV2')
             except(Exception, Error) as error:
                 logger.info(error)
                 print(error)
@@ -353,9 +377,10 @@ def astroweek(call: types.CallbackQuery):
             finally:
                 cursor4.close()
                 connection4.close()
+                await asyncio.sleep(3)
         else:
             #call.message.answer("платеж не прошел")
-            bot.send_message(chat_id,'Оплата не удалась, попробуй еще раз или обратись в поддержку!')
+            await bot.send_message(chat_id,'Оплата не удалась, попробуй еще раз или обратись в поддержку!')
         '''bot.send_message(chat_id,'https://yookassa.ru/my/i/ZLQIyDX6rGTs/l')
         bot.send_invoice(chat_id=chat_id,
                          title='ASTROWEEK',
@@ -366,7 +391,7 @@ def astroweek(call: types.CallbackQuery):
                          start_parameter='astroweek',
                          prices=[types.LabeledPrice(label='astroweek', amount=10000)])'''
     else:
-        bot.send_message(chat_id,'Похоже, ты уже приобрел доступ к Astroweek. Если первое видео еще не пришло, жди его в ближайший понедельник!')
+        await bot.send_message(chat_id,'Похоже, ты уже приобрел доступ к Astroweek. Если первое видео еще не пришло, жди его в ближайший понедельник!')
 
 '''@bot.pre_checkout_query_handler(func=lambda query: True)
 def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery):
@@ -397,35 +422,70 @@ def process_pay(message: types.Message):
             cursor4.close()
             connection4.close()'''
 
+@bot.callback_query_handler(func= lambda call: call.data == 'now')
+async def astroweek_now(call: types.CallbackQuery):
+    chat_id = call.message.chat.id
+    try:
+        connection7 = psycopg2.connect(user=os.getenv('PGUSER'),
+                                       password=os.getenv('PGPASSWORD'),
+                                       host=os.getenv('PGHOST'),
+                                       port=os.getenv('PGPORT'),
+                                       database=os.getenv('PGDATABASE'))
+        cursor7 = connection7.cursor(cursor_factory=NamedTupleCursor)
+        for i in ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']:
+            youtube_link = data.astro_video[i]
+            video_html = f'<a href="{youtube_link}">' + i + '</a>'
+            await bot.send_message(chat_id, video_html, parse_mode='HTML')
+            # for j in ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']:
+            #await asyncio.sleep(1)
+            #await bot.send_message(chat_id, data.description[i], parse_mode='MarkdownV2')
+            await asyncio.sleep(3)
+            await bot.send_message(chat_id, data.tasks[i], parse_mode='MarkdownV2')
+            cursor7.execute("UPDATE Public.astroweek SET \"{}\" = True WHERE astroweek.chat_id = (select data.id from data where chat_id = {})".format(i.lower(), chat_id))
+            await asyncio.sleep(3)
+            if i.lower() == 'sunday':
+                await asyncio.sleep(2)
+                await send_pptx(i,'Курс подошел к концу. Эта шпаргалка поможет в будущем)')
+        connection7.commit()
+    except(Exception, Error) as error:
+        logger.info(error)
+        print(error)
+        print('Ошибка 7 при работе с PostgreSQL')
+    finally:
+        cursor7.close()
+        connection7.close()
+    await bot.delete_message(chat_id, call.message.message_id)
+    #await bot.send_message(chat_id, 'Жди новые продукты!')
+
+@bot.callback_query_handler(func= lambda call: call.data == 'days')
+async def astroweek_later(call: types.CallbackQuery):
+    chat_id = call.message.chat.id
+    await bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
+    await bot.delete_message(chat_id, call.message.message_id)
+
 @bot.callback_query_handler(func= lambda call: call.data == 'later')
-def later_func(call: types.CallbackQuery):
+async def later_func(call: types.CallbackQuery):
     chat_id = call.message.chat.id
     #bot.delete_message(chat_id, call.message.message_id)
-    bot.send_message(chat_id, data.later, parse_mode= 'MarkdownV2')
+    await bot.send_message(chat_id, data.later, parse_mode= 'MarkdownV2')
 
 @bot.callback_query_handler(func= lambda call: call.data == 'comments')
-def comments_func(call: types.CallbackQuery):
+async def comments_func(call: types.CallbackQuery):
     chat_id = call.message.chat.id
     #bot.delete_message(chat_id, call.message.message_id)
-    send_multiple_images(chat_id,data.picture_paths)
-    time.sleep(3)
-    bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
+    await send_multiple_images(chat_id,data.picture_paths)
+    await asyncio.sleep(3)
+    await bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
 
-def schedule_checker():
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
-def run_bot():
+async def run_bot():
     # Start the bot polling
-    Thread(target=schedule_checker).start()
-    bot.polling(none_stop=True)
+    scheduler.add_job(send_day,'cron', day_of_week='mon-sun', hour=18, minute=6, args=(bot,))
+    scheduler.start()
+    await bot.polling(none_stop=True)
 
 if __name__ == '__main__':
-    schedule.every().day.at('09:00').do(send_day)
     while True:
         try:
-            run_bot()
+            asyncio.run(run_bot())
         except Exception as e:
-            time.sleep(1)
             logger.info(e)
