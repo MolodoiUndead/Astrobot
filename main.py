@@ -13,32 +13,33 @@ import json
 import asyncio
 from tzlocal import get_localzone
 
+WEEK_LIST = ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']
+WEEK_DICT = {'Monday':0, 'Tuesday':1, 'Wednesday':2,'Thursday':3,'Friday':4,'Saturday':5,'Sunday':6}
 
 scheduler = AsyncIOScheduler(timezone=str(get_localzone()))
 
+### TEST
 #os.environ['ACC_ID']='219009'
 #os.environ['KEY']='live_DNLV_Mwuqga6CeMLSQwekNG_K-aWAKYHap_UTBFof8g'
+#os.environ['TELEGRAM_TOKEN']='6030183564:AAH1-VdUq3Gu6KvI6SHQa9klkBrGX7Pa9oM'
+#os.environ['PGUSER']='postgres'
+#os.environ['PGPASSWORD']='CuOuik2xVHTFF33lM4r5'
+#os.environ['PGHOST']='containers-us-west-53.railway.app'
+#os.environ['PGPORT']='7525'
+#os.environ['PGDATABASE']='railway'
+#os.environ['ASTROLAB_PRICE'] = '1.00'
 
 Configuration.account_id = os.getenv('ACC_ID')
 Configuration.secret_key = os.getenv('KEY')
 
-# test
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set up the Telegram Bot token
 ##os.environ['TELEGRAM_TOKEN']='6222346347:AAHyDnaolTMOdVQdj9cpQUQR4_4ucl20PWM'
 ##os.environ['YOO_TOKEN']='390540012:LIVE:35652'
-
-#os.environ['TELEGRAM_TOKEN']='6030183564:AAH1-VdUq3Gu6KvI6SHQa9klkBrGX7Pa9oM'
 ##os.environ['YOO_TOKEN']='381764678:TEST:60173'
 ##os.environ['YOO_TOKEN']='381764678:TEST:59224'
-#os.environ['PGUSER']='postgres'
-#os.environ['PGPASSWORD']='CuOuik2xVHTFF33lM4r5'
-#os.environ['PGHOST']='containers-us-west-53.railway.app'
-#os.environ['PGPORT']='7525'
-#os.environ['PGDATABASE']='railway'
-#os.environ['ASTROLAB_PRICE'] = '10.00'
 
 # Create an instance of the bot
 bot = AsyncTeleBot(os.getenv('TELEGRAM_TOKEN'))
@@ -98,14 +99,16 @@ async def send_day(bot: bot):
             await bot.send_message(i,video_html, parse_mode='HTML')
             #for j in ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']:
             #await asyncio.sleep(1)
-            #await bot.send_message(i, data.description[day_name], parse_mode='MarkdownV2')
+            #await bot.send_message(i, data.description[day_name])
             await asyncio.sleep(3)
-            await bot.send_message(i,data.tasks[day_name] , parse_mode='MarkdownV2')
+            keyboard = types.InlineKeyboardMarkup()
+            row1 = [types.InlineKeyboardButton('Получить задание на день', callback_data=day_name)]
+            keyboard.add(*row1)
+            await bot.send_message(i,'Теорию нужно подкреплять практикой!',reply_markup=keyboard)
+
             cursor_day.execute("UPDATE Public.astroweek SET \"{}\" = True WHERE astroweek.chat_id = (select data.id from data where chat_id = {})".format(day_name.lower(),i))
             connection_day.commit()
-            if day_name.lower() == 'sunday':
-                await asyncio.sleep(2)
-                await send_pptx(i,'Курс подошел к концу. Эта шпаргалка поможет в будущем)')
+
     except(Exception, Error) as error:
         logger.info(error)
         print(error)
@@ -344,7 +347,7 @@ async def astroweek(call: types.CallbackQuery):
         #call.message.answer('Оплата марафона')
         payment_deatils = payment(os.getenv('ASTROLAB_PRICE'), 'Доступ к ASTROWEEK')
         #call.message.answer((payment_deatils['confirmation'])['confirmation_url'])
-        await bot.send_message(chat_id,'Ссылка на оплату: \n'+(payment_deatils['confirmation'])['confirmation_url'])
+        await bot.send_message(chat_id,'Ссылка на оплату: \n'+(payment_deatils['confirmation'])['confirmation_url']+'\n Если возникли вопросы по оплате, пиши напрямую @evgenia_astrolab')
         if await check_payment(payment_deatils['id']):
             #call.message.answer("платеж")
             await bot.send_message(chat_id,"Оплата прошла успешно!")
@@ -364,8 +367,8 @@ async def astroweek(call: types.CallbackQuery):
                 await bot.send_message(chat_id, video_html, parse_mode='HTML')
                 await bot.send_message(chat_id, data.description['Start'], parse_mode='MarkdownV2')
                 keyboard = types.InlineKeyboardMarkup()
-                row1 = [types.InlineKeyboardButton('Открыть полный доступ к курсу сейчас', callback_data='now')]
-                row2 = [types.InlineKeyboardButton('Начать с ближайшего понедельника (рекомендуется)', callback_data='days')]
+                row1 = [types.InlineKeyboardButton('Открыть полный доступ к курсу сейчас', callback_data='Monday-now')]
+                row2 = [types.InlineKeyboardButton('Начать с ближайшего понедельника', callback_data='days')]
                 keyboard.add(*row1)
                 keyboard.add(*row2)
                 await asyncio.sleep(5)
@@ -422,9 +425,10 @@ def process_pay(message: types.Message):
             cursor4.close()
             connection4.close()'''
 
-@bot.callback_query_handler(func= lambda call: call.data == 'now')
+@bot.callback_query_handler(func= lambda call: call.data.split('-')[-1] == 'now')
 async def astroweek_now(call: types.CallbackQuery):
     chat_id = call.message.chat.id
+    i = call.data.split('-')[0]
     try:
         connection7 = psycopg2.connect(user=os.getenv('PGUSER'),
                                        password=os.getenv('PGPASSWORD'),
@@ -432,21 +436,22 @@ async def astroweek_now(call: types.CallbackQuery):
                                        port=os.getenv('PGPORT'),
                                        database=os.getenv('PGDATABASE'))
         cursor7 = connection7.cursor(cursor_factory=NamedTupleCursor)
-        for i in ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']:
-            youtube_link = data.astro_video[i]
-            video_html = f'<a href="{youtube_link}">' + i + '</a>'
-            await bot.send_message(chat_id, video_html, parse_mode='HTML')
-            # for j in ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']:
-            #await asyncio.sleep(1)
-            #await bot.send_message(chat_id, data.description[i], parse_mode='MarkdownV2')
-            await asyncio.sleep(3)
-            await bot.send_message(chat_id, data.tasks[i], parse_mode='MarkdownV2')
-            cursor7.execute("UPDATE Public.astroweek SET \"{}\" = True WHERE astroweek.chat_id = (select data.id from data where chat_id = {})".format(i.lower(), chat_id))
-            await asyncio.sleep(3)
-            if i.lower() == 'sunday':
-                await asyncio.sleep(2)
-                await send_pptx(chat_id,'Курс подошел к концу. Эта шпаргалка поможет в будущем)')
+        youtube_link = data.astro_video[i]
+        video_html = f'<a href="{youtube_link}">' + i + '</a>'
+        await bot.send_message(chat_id, video_html, parse_mode='HTML')
+        # for j in ['Monday', 'Tuesday', 'Wednesday','Thursday','Friday','Saturday','Sunday']:
+        #await asyncio.sleep(1)
+        await bot.send_message(chat_id, data.description[i])
+        await asyncio.sleep(3)
+
+        keyboard = types.InlineKeyboardMarkup()
+        row1 = [types.InlineKeyboardButton('Получить задание на день', callback_data=i)]
+        keyboard.add(*row1)
+        await bot.send_message(chat_id, 'Теорию нужно подкреплять практикой!', reply_markup=keyboard)
+
+        cursor7.execute("UPDATE Public.astroweek SET \"{}\" = True WHERE astroweek.chat_id = (select data.id from data where chat_id = {})".format(i.lower(), chat_id))
         connection7.commit()
+
     except(Exception, Error) as error:
         logger.info(error)
         print(error)
@@ -460,7 +465,7 @@ async def astroweek_now(call: types.CallbackQuery):
 @bot.callback_query_handler(func= lambda call: call.data == 'days')
 async def astroweek_later(call: types.CallbackQuery):
     chat_id = call.message.chat.id
-    await bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
+    await bot.send_message(chat_id, 'А пока ты можешь делать запросы по дате рождения', parse_mode='MarkdownV2')
     await bot.delete_message(chat_id, call.message.message_id)
 
 @bot.callback_query_handler(func= lambda call: call.data == 'later')
@@ -469,13 +474,41 @@ async def later_func(call: types.CallbackQuery):
     #bot.delete_message(chat_id, call.message.message_id)
     await bot.send_message(chat_id, data.later, parse_mode= 'MarkdownV2')
 
-@bot.callback_query_handler(func= lambda call: call.data == 'comments')
+@bot.callback_query_handler(func= lambda call: call.data in ['comments'])
 async def comments_func(call: types.CallbackQuery):
     chat_id = call.message.chat.id
     #bot.delete_message(chat_id, call.message.message_id)
     await send_multiple_images(chat_id,data.picture_paths)
     await asyncio.sleep(3)
-    await bot.send_message(chat_id, data.later, parse_mode='MarkdownV2')
+    keyboard = types.InlineKeyboardMarkup()
+    row1 = [types.InlineKeyboardButton('Получить доступ к ASTROWEEK!', callback_data='astroweek')]
+    row3 = [types.InlineKeyboardButton('Позже', callback_data='later')]
+    keyboard.add(*row1)
+    keyboard.add(*row3)
+    await asyncio.sleep(3)
+    await bot.send_message(chat_id,'Присоединяйся к ASTROWEEK, по всем интересующим вопросам пиши @evgenia_astrolab', reply_markup=keyboard)
+
+@bot.callback_query_handler(func= lambda call: call.data in WEEK_LIST)
+async def tasks (call: types.CallbackQuery):
+    chat_id = call.message.chat.id
+
+    await bot.delete_message(chat_id, call.message.message_id)
+
+    await bot.send_message(chat_id, data.tasks[call.data], parse_mode='MarkdownV2')
+
+    await asyncio.sleep(3)
+    if call.data == 'Sunday':
+        await asyncio.sleep(2)
+        youtube_link = "https://www.youtube.com/playlist?list=PLRzFzh4t3pDxlSlBGr4-FfA9UIIZ9-Xl9"
+        video_html = f'<a href="{youtube_link}"></a>'
+        await send_pptx(chat_id, 'Курс подошел к концу. Эта шпаргалка поможет в будущем) Все видео ты сможешь найти в плейлисте')
+        await bot.send_message(chat_id,video_html, parse_mode='HTML')
+
+    else:
+        keyboard = types.InlineKeyboardMarkup()
+        row1 = [types.InlineKeyboardButton('Следующий день!', callback_data=WEEK_LIST[WEEK_DICT[call.data]+1] + '-now')]
+        keyboard.add(*row1)
+        await bot.send_message(chat_id, 'Если все задания выполнены, можешь переходить к следующему дню! или дождаться следующего дня недели для полноты погружения', reply_markup=keyboard)
 
 async def run_bot():
     # Start the bot polling
