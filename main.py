@@ -142,7 +142,7 @@ def sum_digits(n):
 
 async def send_pptx(chat_id, caption):
     # Load the video file from the local disk
-    with open('Astrolab_Astroweek.pptx', 'rb') as file:
+    with open('Astrolab_Astroweek.pdf', 'rb') as file:
         await bot.send_document(chat_id, file, caption=caption)
 
 async def show_video(chat_id):
@@ -501,14 +501,14 @@ async def tasks (call: types.CallbackQuery):
         await asyncio.sleep(2)
         youtube_link = "https://www.youtube.com/playlist?list=PLRzFzh4t3pDxlSlBGr4-FfA9UIIZ9-Xl9"
         video_html = f'<a href="{youtube_link}"></a>'
-        await send_pptx(chat_id, 'Курс подошел к концу. Эта шпаргалка поможет в будущем) Все видео ты сможешь найти в плейлисте')
+        await send_pptx(chat_id, 'Курс подошел к концу. Эта шпаргалка поможет в будущем. Все видео ты сможешь найти в плейлисте')
         await bot.send_message(chat_id,video_html, parse_mode='HTML')
 
     else:
         keyboard = types.InlineKeyboardMarkup()
         row1 = [types.InlineKeyboardButton('Следующий день!', callback_data=WEEK_LIST[WEEK_DICT[call.data]+1] + '-now')]
         keyboard.add(*row1)
-        await bot.send_message(chat_id, 'Если все задания выполнены, можешь переходить к следующему дню! или дождаться следующего дня недели для полноты погружения', reply_markup=keyboard)
+        await bot.send_message(chat_id, 'Если все задания выполнены, можешь переходить к следующему дню! Или дождаться следующего дня недели для полноты погружения 💫', reply_markup=keyboard)
 
 async def run_bot():
     # Start the bot polling
